@@ -1,0 +1,238 @@
+---
+title: "SVAP_LabQue"
+author: "Lavanya"
+date: "September 24, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rvest)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+## Analysing Datewise Onion Prices 
+
+## Scraping year 2017 Datewise data till Sep19th 
+```{r}
+
+getwd()
+Dailydata = read_html("../DailyWiseMarketArrivals.html") %>%
+  html_node("#dnn_ctr966_DailyWiseMarketArrivals_GridView1") %>%
+  html_table()
+
+str(Dailydata)
+View(Dailydata)
+
+```
+
+## Question 1
+## Finding the State with highest Quantity Sales
+
+## Refining the data
+```{r}
+#Changing the column names 
+New_Cols = c('Date', 'Market', 'Quantity', 'Pricemin', 'Pricemax', 'ModPrice')
+colnames(Dailydata) = New_Cols
+
+#Converting all Price columns to numeric and Datatype of Date from Char to Date
+
+Dailydata$Pricemax = as.numeric(Dailydata$Pricemax)
+Dailydata$Pricemin = as.numeric(Dailydata$Pricemin)
+Dailydata$ModPrice = as.numeric(Dailydata$ModPrice)
+Dailydata$Date = as.Date(Dailydata$Date,"%d/%b/%Y")
+head(Dailydata)
+
+# Removing the Total row
+
+Dailydata = Dailydata %>% filter(Quantity< 10000000)
+tail(Dailydata)  
+```
+## Treating missing values - replacing the quantities with respective means
+## Finding the columns with missing values, replace 0s with NAs
+
+```{r}
+
+#Calculate mean to replace missing values
+Pricemin_mean = round(mean(Dailydata$Pricemin))
+Pricemax_mean = round(mean(Dailydata$Pricemax))
+ModPrice_mean = round(mean(Dailydata$ModPrice))
+
+Pricemin_mean
+Pricemax_mean
+ModPrice_mean
+
+
+#Replacing zeroes with NA
+is.na(Dailydata$Pricemin) = !Dailydata$Pricemin
+is.na(Dailydata$Pricemax) = !Dailydata$Pricemax
+is.na(Dailydata$ModPrice) = !Dailydata$ModPrice
+
+#Replacing missing values with mean
+
+Dailydata = Dailydata %>% replace_na(list(Pricemin = Pricemin_mean,Pricemax = Pricemax_mean, ModPrice = ModPrice_mean))
+
+View(Dailydata)
+```
+
+## Grouping by States
+
+```{r}
+
+Dailydata = Dailydata %>% 
+  mutate(Market1 = Market) %>%
+      separate(Market1,c("city","state","subdat"), sep="\\(")
+head(Dailydata)
+
+#Finding Total states under observation
+Data_State = Dailydata %>% distinct(state)
+Data_State
+str(Dailydata)
+
+```
+
+## Cleaning Data
+## Replacing the NA in State column for few major cities and removing Duplicate State names, and adding state as DELHI for City Delhi
+
+```{r}
+
+Clean_Data = Dailydata %>% 
+  mutate(state = replace(state,
+                            is.na(state) & city == 'BANGALORE',
+                          'KNT)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'CHENNAI', 
+                          'TN)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'BULANDSHAHR', 
+                          'UP)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'LUCKNOW', 
+                          'UP)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'SHAHJAHANPUR',
+                          'UP)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'MUMBAI', 
+                          'MS)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'NAGPUR', 
+                          'MS)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'JAIPUR', 
+                          'RJ)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'KOLKATA', 
+                          'WB)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'HYDERABAD', 
+                          'TELANGANA)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'GUWAHATI', 
+                          'AS)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'BHOPAL', 
+                          'MP)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'SHIMLA', 
+                          'HP)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'TRIVANDRUM', 
+                          'KER)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'CHANDIGARH', 
+                          'CHGARH)')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'JAMMU', 
+                          'JK')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'DELHI', 
+                          'DELHI')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'GANGTOK',
+                          'SIKKIM')) %>%
+  mutate(state = replace(state,
+                            is.na(state) & city == 'PATNA',
+                          'BIHAR')) %>%
+  mutate(state = replace(state,
+                            state == 'Telangana)' | state == 'TELANGANA)',
+                          'TELANGANA')) %>%
+  mutate(state = replace(state,
+                            state == 'F&V) ' & city == 'SHIVPURI', 
+                          'MP)')) %>%
+  mutate(state = replace(state,
+                            state == 'RAJ)' | state == 'RJ)',
+                          'RAJ)')) %>%
+  mutate(state = replace(state,
+                            state == 'TN)' | state == 'TN) ',
+                          'TN)'))
+         
+View(Clean_Data)
+str(Clean_Data)
+
+```
+
+
+## Finding Distinct states 
+```{r}
+Data_State_new = Clean_Data %>% distinct(state)
+Data_State_new
+
+```
+
+## Calculating Quantitysales based on states
+
+```{r}
+Sta_qty = Clean_Data %>% group_by(state) %>% 
+  summarise(Quant_Sales = sum(Quantity)) %>% 
+  arrange(desc(Quant_Sales)) 
+head(Sta_qty)
+
+
+```
+
+## INSIGHT
+## Therefore the state with highest Quantity sales is 'MAHARASHTRA'
+## PLotting the Graph
+
+
+```{r}
+
+library(plotly)
+State_Quant_plot = ggplot(Sta_qty)+ aes(state,Quant_Sales, fill = state) + geom_col(width=1)
+ggplotly(State_Quant_plot)
+
+```
+
+## Hence the state with highest Quantity sales is MS- Maharashtra, So Lets use Linear regression model and predict the Quantity sales for next 30 days
+
+
+## Question2
+## Predict the daily price for the next 30 days for state with highest Quantity Sales.
+
+```{r}
+
+# Filtering Maharashtra State Data and calculate mean of Moderate price per day 
+# and select Date and Moderate price
+MH_Data = Clean_Data %>% filter(state==c("MS)")) %>% group_by(Date) %>%
+  summarise(ModPrice_new = mean(ModPrice)) %>% 
+  select(Date,ModPrice_new)
+ 
+#renaming column names as ds and y 
+colnames(MH_Data) = c('ds' ,'y')
+
+#Forecasting using prophet forecaster for the month of october
+library(prophet)
+m = prophet(MH_Data)
+Predicted_DailyPrice = make_future_dataframe(m, period=45, freq="d")
+forecast= predict(m,Predicted_DailyPrice)
+
+plot(m,forecast)
+tail(Predicted_DailyPrice)
+View(MH_Data)
+
+```
+
+## From the above plot we can find that the Onion prices is likely to increase in the month of October and beginning of November.
